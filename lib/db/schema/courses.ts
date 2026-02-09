@@ -14,6 +14,7 @@ export const courses = pgTable('courses', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   url: varchar('url', { length: 200 }).notNull().unique(),
+  imageUrl: varchar('image_url', { length: 500 }),
   categoryId: integer('category_id')
     .notNull()
     .references(() => categories.id, { onDelete: 'cascade' }),
