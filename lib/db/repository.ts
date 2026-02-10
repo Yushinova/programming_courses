@@ -13,14 +13,6 @@ export type NewCourse = InferInsertModel<typeof courses>;
 export type NewRequirement = InferInsertModel<typeof requirements>;
 export type NewOutcome = InferInsertModel<typeof outcomes>;
 
-export interface GPTAnalysis {
-  age?: number;
-  level?: 'начальный' | 'средний' | 'продвинутый';
-  keywords: string[];
-  category?: 'дети' | 'подростки' | 'взрослые';
-  matchedCourseIds?: number[]; // ← Добавим ID найденных курсов
-}
-
 export class CoursesRepository {
   // === Категории ===
   async createCategory(data: NewCategory): Promise<Category> {
@@ -100,19 +92,6 @@ export class CoursesRepository {
     return course || null;
   }
 
-  async searchCourses(query: string): Promise<Course[]> {
-    return await db
-      .select()
-      .from(courses)
-      .where(
-        and(
-          eq(courses.isActive, true),
-          like(courses.title, `%${query}%`)
-        )
-      )
-      .orderBy(desc(courses.createdAt));
-  }
-
   // === Требования ===
   async addRequirement(data: NewRequirement): Promise<Requirement> {
     const [requirement] = await db
@@ -173,7 +152,6 @@ export class CoursesRepository {
       }, {} as Record<string, number>),
     };
   }
-// === МЕТОДЫ ДЛЯ ALEX БОТА ===
 
   // 1. Поиск курсов по возрасту
   async getCoursesByAge(age: number): Promise<Course[]> {
@@ -201,207 +179,6 @@ export class CoursesRepository {
     });
   }
 
-  // 3. Умный поиск по анализу GPT (ОСНОВНОЙ МЕТОД ДЛЯ ALEX)
-  async findCoursesByGPTAnalysis(analysis: GPTAnalysis): Promise<{
-  courses: Course[];
-  analysis: GPTAnalysis;
-}> {
-  // Базовые фильтры
-  const filters: any = { isActive: true };
-  
-  // 1. Фильтр по возрасту/категории
-  if (analysis.age) {
-    if (analysis.age <= 12) filters.categoryId = 1;
-    else if (analysis.age <= 18) filters.categoryId = 2;
-    else filters.categoryId = 3;
-  } else if (analysis.category) {
-    // Или по категории из GPT
-    const categoryMap = {
-      'дети': 1,
-      'подростки': 2, 
-      'взрослые': 3
-    };
-    if (categoryMap[analysis.category as keyof typeof categoryMap]) {
-      filters.categoryId = categoryMap[analysis.category as keyof typeof categoryMap];
-    }
-  }
-  
-  // 2. Фильтр по уровню
-  if (analysis.level && ['начальный', 'средний', 'продвинутый'].includes(analysis.level)) {
-    filters.level = analysis.level;
-  }
-  
-  // 3. Получаем курсы по базовым фильтрам
-  let foundCourses = await this.getCourses(filters);
-  
-  // 4. Если есть ключевые слова - фильтруем дополнительно
-  if (analysis.keywords && analysis.keywords.length > 0) {
-    foundCourses = this.filterCoursesByKeywords(foundCourses, analysis.keywords);
-  }
-  
-  // 5. Сортируем по релевантности
-  foundCourses.sort((a, b) => {
-    const scoreA = this.calculateCourseRelevance(a, analysis);
-    const scoreB = this.calculateCourseRelevance(b, analysis);
-    return scoreB - scoreA; // по убыванию
-  });
-  
-  // 6. Берем топ-5
-  const topCourses = foundCourses.slice(0, 5);
-  
-  // 7. Сохраняем ID найденных курсов в анализе
-  const updatedAnalysis: GPTAnalysis = {
-    ...analysis,
-    matchedCourseIds: topCourses.map(course => course.id)
-  };
-  
-  // 8. Возвращаем объект с курсами и обновленным анализом
-  return {
-    courses: topCourses,
-    analysis: updatedAnalysis
-  };
-}
-
-  // 4. Простой поиск по ключевым словам (для быстрого старта)
-  async searchCoursesByKeywords(keywords: string[]): Promise<Course[]> {
-    if (!keywords || keywords.length === 0) {
-      return await this.getCourses({ isActive: true });
-    }
-    
-    const allCourses = await this.getCourses({ isActive: true });
-    return this.filterCoursesByKeywords(allCourses, keywords);
-  }
-
-  // 5. Получение топ рекомендаций (упрощенный метод)
-  async getTopRecommendations(params: {
-    age?: number;
-    level?: Course['level'];
-    interests?: string[];
-  }): Promise<Course[]> {
-    const filters: any = { isActive: true };
-
-    // Фильтр по возрасту
-    if (params.age) {
-      if (params.age <= 12) filters.categoryId = 1;
-      else if (params.age <= 18) filters.categoryId = 2;
-      else filters.categoryId = 3;
-    }
-
-    // Фильтр по уровню
-    if (params.level) {
-      filters.level = params.level;
-    }
-
-    let courses = await this.getCourses(filters);
-
-    // Фильтр по интересам если есть
-    if (params.interests && params.interests.length > 0) {
-      courses = this.filterCoursesByKeywords(courses, params.interests);
-    }
-
-    // Ограничиваем 3 результатами
-    return courses.slice(0, 3);
-  }
-
-  // 6. Получение курса со всеми деталями (для подробного ответа)
-  async getCourseWithDetails(courseId: number) {
-    const [course] = await db
-      .select()
-      .from(courses)
-      .where(eq(courses.id, courseId))
-      .limit(1);
-
-    if (!course) return null;
-
-    const [category] = await db
-      .select()
-      .from(categories)
-      .where(eq(categories.id, course.categoryId))
-      .limit(1);
-
-    const courseRequirements = await this.getCourseRequirements(courseId);
-    const courseOutcomes = await this.getCourseOutcomes(courseId);
-
-    return {
-      ...course,
-      category,
-      requirements: courseRequirements,
-      outcomes: courseOutcomes
-    };
-  }
-
-  // === ВСПОМОГАТЕЛЬНЫЕ ПРИВАТНЫЕ МЕТОДЫ ===
-
-  // Фильтрация курсов по ключевым словам
-  private filterCoursesByKeywords(courses: Course[], keywords: string[]): Course[] {
-    if (!keywords || keywords.length === 0) return courses;
-    
-    return courses.filter(course => {
-      const courseText = `
-        ${course.title.toLowerCase()}
-        ${course.description.toLowerCase()}
-      `;
-      
-      // Проверяем наличие хотя бы одного ключевого слова
-      return keywords.some(keyword => 
-        keyword && courseText.includes(keyword.toLowerCase())
-      );
-    });
-  }
-
-  // Подсчет релевантности курса
-  private calculateCourseRelevance(course: Course, analysis: GPTAnalysis): number {
-    let score = 0;
-    const courseText = `${course.title} ${course.description}`.toLowerCase();
-    
-    // За ключевые слова
-    if (analysis.keywords) {
-      analysis.keywords.forEach((keyword: string) => {
-        if (keyword && courseText.includes(keyword.toLowerCase())) {
-          score += 3;
-        }
-      });
-    }
-    
-    // За точное совпадение уровня
-    if (course.level === analysis.level) score += 5;
-    
-    // За активный курс
-    if (course.isActive) score += 2;
-    
-    // Новые курсы предпочтительнее
-    const daysOld = (new Date().getTime() - new Date(course.createdAt).getTime()) / (1000 * 3600 * 24);
-    if (daysOld < 30) score += 1;
-    
-    return score;
-  }
-
-  // Извлечение ключевых слов из запроса (простая версия, можно использовать если GPT не работает)
-  extractKeywordsFromQuery(query: string): string[] {
-    const queryLower = query.toLowerCase();
-    const keywords: string[] = [];
-
-    // Технологии
-    const techKeywords = [
-      { words: ['javascript', 'js', 'джаваскрипт'], tag: 'javascript' },
-      { words: ['python', 'питон'], tag: 'python' },
-      { words: ['react', 'реакт'], tag: 'react' },
-      { words: ['html', 'css', 'верстк'], tag: 'html' },
-      { words: ['игр', 'unity', 'геймдев', 'game'], tag: 'игры' },
-      { words: ['сайт', 'веб', 'web', 'frontend'], tag: 'веб' },
-      { words: ['данн', 'data', 'анализ', 'машинн'], tag: 'данные' },
-      { words: ['мобильн', 'android', 'ios'], tag: 'мобильные' }
-    ];
-
-    // Добавляем найденные ключевые слова
-    techKeywords.forEach(marker => {
-      if (marker.words.some(word => queryLower.includes(word))) {
-        keywords.push(marker.tag);
-      }
-    });
-
-    return keywords;
-  }
   // Получение курса по ID с URL
 async getCourseById(id: number): Promise<Course | null> {
   const [course] = await db
@@ -440,7 +217,7 @@ async getCoursesByIds(ids: number[]): Promise<Course[]> {
 // Формирование HTML ссылок для GPT
 formatCoursesWithLinks(courses: Course[]): string {
   return courses.map(course => 
-    `• <a href="/courses/${course.url}">${course.title}</a> (${course.level}, ${course.duration}, ${course.price}₽)`
+    `• <a href=/courses/${course.url}>${course.title}</a> (${course.level}, ${course.duration}, ${course.price}₽)`
   ).join('\n');
 }
 
@@ -450,6 +227,166 @@ formatCoursesWithMarkdownLinks(courses: Course[]): string {
     `• [${course.title}](/courses/${course.url}) (${course.level}, ${course.duration}, ${course.price}₽)`
   ).join('\n');
 }
+
+async getAllCoursesWithDetails(): Promise<Array<{
+    course: string;
+    requirements: string[];
+    outcomes: string[];
+  }>> {
+    // Получаем ВСЕ курсы без фильтров
+    const allCourses = await db
+      .select()
+      .from(courses)
+      .orderBy(asc(courses.id));
+
+    if (!allCourses.length) {
+      return [];
+    }
+
+    // Собираем детали для каждого курса
+    const coursesWithDetails = await Promise.all(
+      allCourses.map(async (course) => {
+        // Получаем требования курса
+        const requirementsList = await db
+          .select()
+          .from(requirements)
+          .where(eq(requirements.courseId, course.id))
+          .orderBy(asc(requirements.id));
+
+        // Получаем результаты курса
+        const outcomesList = await db
+          .select()
+          .from(outcomes)
+          .where(eq(outcomes.courseId, course.id))
+          .orderBy(asc(outcomes.id));
+
+        // Форматируем строку курса
+        const courseString = `${course.title} | Уровень: ${course.level} | Длительность: ${course.duration} | Цена: ${course.price}${course.currency || '₽'} | Активный: ${course.isActive ? 'Да' : 'Нет'} | Категория ID: ${course.categoryId}`;
+
+        return {
+          course: courseString,
+          requirements: requirementsList.map(req => req.text), // requirements.text
+          outcomes: outcomesList.map(outcome => `${outcome.skill} (${outcome.level})`) // outcomes.skill + outcomes.level
+        };
+      })
+    );
+
+    return coursesWithDetails;
+  }
+
+  /**
+   * Альтернативная версия: получить все курсы с деталями в виде плоской структуры
+   * @returns Массив строк, где каждый курс представлен одной строкой
+   */
+  async getAllCoursesAsStrings(): Promise<string[]> {
+    const allCourses = await db
+      .select()
+      .from(courses)
+      .orderBy(asc(courses.id));
+
+    if (!allCourses.length) {
+      return ['Курсы не найдены'];
+    }
+
+    const coursesAsStrings = await Promise.all(
+      allCourses.map(async (course) => {
+        const requirementsList = await db
+          .select()
+          .from(requirements)
+          .where(eq(requirements.courseId, course.id));
+        
+        const outcomesList = await db
+          .select()
+          .from(outcomes)
+          .where(eq(outcomes.courseId, course.id));
+
+        // Форматируем в единую строку
+        const courseInfo = `
+        Курс: ${course.title}
+        Описание: ${course.description}
+        Уровень: ${course.level}
+        Длительность: ${course.duration}
+        Цена: ${course.price}${course.currency || '₽'}
+        URL: ${course.url}
+        Статус: ${course.isActive ? 'Активный' : 'Неактивный'}
+        Категория ID: ${course.categoryId}
+        ${course.imageUrl ? `Изображение: ${course.imageUrl}` : ''}
+
+        Требования:
+        ${requirementsList.length > 0 ? requirementsList.map(req => `  • ${req.text}`).join('\n') : '  Нет требований'}
+
+        Результаты (навыки):
+        ${outcomesList.length > 0 ? outcomesList.map(out => `  • ${out.skill} (уровень: ${out.level})`).join('\n') : '  Нет результатов'}
+                `.trim();
+
+        return courseInfo;
+      })
+    );
+
+    return coursesAsStrings;
+  }
+
+  /**
+   * Получить все курсы с полной информацией, включая категории
+   * @returns Массив строк с полной информацией о курсах
+   */
+  async getAllCoursesFullInfo(): Promise<string[]> {
+    const allCourses = await db
+      .select()
+      .from(courses)
+      .orderBy(asc(courses.id));
+
+    if (!allCourses.length) {
+      return ['Курсы не найдены'];
+    }
+
+    // Получаем все категории для отображения их имен
+    const allCategories = await db.select().from(categories);
+    const categoryMap = new Map(allCategories.map(cat => [cat.id, cat.name]));
+
+    const coursesFullInfo = await Promise.all(
+      allCourses.map(async (course) => {
+        const requirementsList = await db
+          .select()
+          .from(requirements)
+          .where(eq(requirements.courseId, course.id));
+        
+        const outcomesList = await db
+          .select()
+          .from(outcomes)
+          .where(eq(outcomes.courseId, course.id));
+
+        const categoryName = categoryMap.get(course.categoryId) || `Категория ${course.categoryId}`;
+
+        // Форматируем в единую строку
+        const courseInfo = `
+          ========================================
+          НАЗВАНИЕ: ${course.title}
+          КАТЕГОРИЯ: ${categoryName}
+          УРОВЕНЬ: ${course.level}
+          ДЛИТЕЛЬНОСТЬ: ${course.duration}
+          ЦЕНА: ${course.price}${course.currency || '₽'}
+          СТАТУС: ${course.isActive ? '✅ Активный' : '❌ Неактивный'}
+          URL: /courses/${course.url}
+          ${course.imageUrl ? `ИЗОБРАЖЕНИЕ: ${course.imageUrl}` : ''}
+
+          ОПИСАНИЕ:
+          ${course.description}
+
+          ТРЕБОВАНИЯ (${requirementsList.length}):
+          ${requirementsList.length > 0 ? requirementsList.map((req, i) => `${i + 1}. ${req.text}`).join('\n') : '  Нет требований'}
+
+          РЕЗУЛЬТАТЫ (${outcomesList.length}):
+          ${outcomesList.length > 0 ? outcomesList.map((out, i) => `${i + 1}. ${out.skill} (уровень: ${out.level})`).join('\n') : '  Нет результатов'}
+          ========================================
+                  `.trim();
+
+        return courseInfo;
+      })
+    );
+
+    return coursesFullInfo;
+  }
 }
 
 // Экспорт синглтон инстанса для удобства

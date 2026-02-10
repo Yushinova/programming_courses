@@ -238,8 +238,8 @@ const formatMessage = (content: string) => {
                 </div>
                 <div className="bg-gray-800/50 border border-gray-700 rounded-2xl rounded-bl-none p-4">
                   <div className="flex items-center gap-2">
-                    <Bot className="w-4 h-4" />
-                    <span className="text-sm font-medium">Alex печатает</span>
+                    <Bot className="w-4 h-4"/>
+                    <span className="text-sm font-medium text-white">Alex печатает</span>
                   </div>
                   <div className="flex gap-1 mt-2">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>

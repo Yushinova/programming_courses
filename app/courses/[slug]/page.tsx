@@ -4,16 +4,81 @@ import Link from 'next/link';
 import { ArrowLeft, Calendar, CreditCard, Users, BookOpen, CheckCircle } from 'lucide-react';
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string }>; // Добавляем Promise
+}
+
+// Генерируем статические пути для всех курсов
+export async function generateStaticParams() {
+  try {
+    console.log('Генерируем статические пути для курсов...');
+    
+    const courses = await coursesRepository.getCourses();
+    
+    console.log(`Найдено курсов: ${courses.length}`);
+    
+    return courses.map((course) => ({
+      slug: course.url, // или course.slug, в зависимости от вашего поля
+    }));
+    
+  } catch (error) {
+    console.error('Ошибка при генерации статических путей для курсов:', error);
+    
+    // Возвращаем пустой массив или несколько примеров
+    return [
+      { slug: 'programming-basics' },
+      { slug: 'web-development' },
+      // Добавьте несколько примеров для сборки
+    ];
+  }
+}
+
+// Метаданные
+export async function generateMetadata({ params }: PageProps) {
+  const { slug } = await params;
+  
+  try {
+    const course = await coursesRepository.getCourseBySlug(slug);
+    
+    if (!course) {
+      return {
+        title: 'Курс не найден',
+        description: 'Запрошенный курс не существует',
+      };
+    }
+    
+    return {
+      title: `${course.title} - Онлайн-курс`,
+      description: course.description,
+    };
+  } catch (error) {
+    return {
+      title: 'Ошибка загрузки курса',
+    };
+  }
 }
 
 export default async function CoursePage({ params }: PageProps) {
+  // Важно: используем await для params
   const { slug } = await params;
-  const course = await coursesRepository.getCourseBySlug(slug);
+  
+  console.log(`Загружаем курс: ${slug}`);
+  
+  let course;
+  try {
+    course = await coursesRepository.getCourseBySlug(slug);
+  } catch (error) {
+    console.error(`Ошибка загрузки курса ${slug}:`, error);
+    notFound();
+  }
   
   if (!course) {
     notFound();
   }
+  
+  // Функция для форматирования цены
+  const formatPrice = (price: number) => {
+    return price.toLocaleString('ru-RU');
+  };
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -21,7 +86,7 @@ export default async function CoursePage({ params }: PageProps) {
         {/* Хлебные крошки */}
         <div className="mb-6">
           <Link 
-            href="/" 
+            href="/courses" 
             className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -41,7 +106,7 @@ export default async function CoursePage({ params }: PageProps) {
                 {course.duration}
               </span>
               <span className="px-3 py-1 bg-white/20 rounded-full text-sm">
-                {course.price.toLocaleString('ru-RU')} ₽
+                {formatPrice(course.price)} ₽
               </span>
             </div>
             
@@ -69,7 +134,7 @@ export default async function CoursePage({ params }: PageProps) {
                     <CreditCard className="w-6 h-6 text-green-600" />
                     <div>
                       <div className="font-semibold">Стоимость</div>
-                      <div className="text-gray-600">{course.price.toLocaleString('ru-RU')} ₽</div>
+                      <div className="text-gray-600">{formatPrice(course.price)} ₽</div>
                     </div>
                   </div>
                   
@@ -90,10 +155,23 @@ export default async function CoursePage({ params }: PageProps) {
                   </div>
                 </div>
                 
+                {/* Дополнительные детали */}
+                {course.categoryId && (
+                  <div className="mb-8 p-4 bg-gray-50 rounded-lg">
+                    <h3 className="font-semibold mb-2">Категория</h3>
+                    <div className="text-gray-600">
+                      {getCategoryName(course.categoryId)}
+                    </div>
+                  </div>
+                )}
+                
                 {/* Кнопка записи */}
-                <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white text-lg font-bold py-4 rounded-xl hover:shadow-xl transition-shadow mb-8">
+                <Link
+                  href={`/contact?course=${encodeURIComponent(course.title)}`}
+                  className="block w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white text-lg font-bold py-4 rounded-xl hover:shadow-xl transition-shadow mb-8 text-center"
+                >
                   Записаться на курс
-                </button>
+                </Link>
                 
                 {/* Кнопка обратно к Alex */}
                 <div className="text-center">
@@ -137,9 +215,12 @@ export default async function CoursePage({ params }: PageProps) {
                     </div>
                   </div>
                   
-                  <button className="w-full mt-6 bg-white border-2 border-blue-600 text-blue-600 font-bold py-3 rounded-lg hover:bg-blue-50 transition-colors">
+                  <Link
+                    href={`/contact?course=${encodeURIComponent(course.title)}&type=consultation`}
+                    className="block w-full mt-6 bg-white border-2 border-blue-600 text-blue-600 font-bold py-3 rounded-lg hover:bg-blue-50 transition-colors text-center"
+                  >
                     Бесплатная консультация
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -148,4 +229,14 @@ export default async function CoursePage({ params }: PageProps) {
       </div>
     </div>
   );
+}
+
+// Вспомогательная функция для названий категорий
+function getCategoryName(categoryId: number): string {
+  const categories: Record<number, string> = {
+    1: 'Для детей (7-12 лет)',
+    2: 'Для подростков (13-18 лет)',
+    3: 'Для взрослых (18+ лет)',
+  };
+  return categories[categoryId] || `Категория ${categoryId}`;
 }

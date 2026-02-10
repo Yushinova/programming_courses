@@ -1,6 +1,6 @@
 import { CoursesRepository } from '@/lib/db/repository';
 import Link from 'next/link';
-import { Code2, Clock, DollarSign, Users } from 'lucide-react';
+import { Code2, Clock, RussianRuble, Users } from 'lucide-react';
 
 export async function generateMetadata() {
   return {
@@ -105,7 +105,7 @@ export default async function CoursesPage() {
                   
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div className="flex items-center gap-2">
-                      <DollarSign className="h-5 w-5 text-green-600" />
+                      <RussianRuble className="h-5 w-5 text-green-600"/>
                       <span className="text-xl font-bold">
                         {course.price.toLocaleString('ru-RU')} ₽
                       </span>
