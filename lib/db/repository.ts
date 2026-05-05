@@ -16,12 +16,22 @@ export type NewOutcome = InferInsertModel<typeof outcomes>;
 export class CoursesRepository {
   // === Категории ===
   async createCategory(data: NewCategory): Promise<Category> {
-    const [category] = await db
-      .insert(categories)
-      .values(data)
-      .returning();
-    return category;
+  const result = await db.insert(categories).values(data).$returningId();
+  const insertedId = result[0].id;
+  
+  // Явно указываем, что выбираем одну запись
+  const selectedCategories = await db
+    .select()
+    .from(categories)
+    .where(eq(categories.id, insertedId));
+  
+  // Проверяем, что запись найдена, и возвращаем её
+  if (!selectedCategories[0]) {
+    throw new Error('Failed to create category');
   }
+  
+  return selectedCategories[0];
+}
 
   async getCategories(): Promise<Category[]> {
     return await db.select().from(categories).orderBy(asc(categories.name));
@@ -29,12 +39,20 @@ export class CoursesRepository {
 
   // === Курсы ===
   async createCourse(data: NewCourse): Promise<Course> {
-    const [course] = await db
-      .insert(courses)
-      .values(data)
-      .returning();
-    return course;
+  const result = await db.insert(courses).values(data).$returningId();
+  const insertedId = result[0].id;
+  
+  const selectedCourses = await db
+    .select()
+    .from(courses)
+    .where(eq(courses.id, insertedId));
+  
+  if (!selectedCourses[0]) {
+    throw new Error('Failed to create course');
   }
+  
+  return selectedCourses[0];
+}
 
   async getCourses(filters?: {
   categoryId?: number;
@@ -94,13 +112,20 @@ export class CoursesRepository {
 
   // === Требования ===
   async addRequirement(data: NewRequirement): Promise<Requirement> {
-    const [requirement] = await db
-      .insert(requirements)
-      .values(data)
-      .returning();
-    return requirement;
+  const result = await db.insert(requirements).values(data).$returningId();
+  const insertedId = result[0].id;
+  
+  const selectedRequirements = await db
+    .select()
+    .from(requirements)
+    .where(eq(requirements.id, insertedId));
+  
+  if (!selectedRequirements[0]) {
+    throw new Error('Failed to add requirement');
   }
-
+  
+  return selectedRequirements[0];
+}
   async getCourseRequirements(courseId: number): Promise<Requirement[]> {
     return await db
       .select()
@@ -110,13 +135,21 @@ export class CoursesRepository {
   }
 
   // === Результаты ===
-  async addOutcome(data: NewOutcome): Promise<Outcome> {
-    const [outcome] = await db
-      .insert(outcomes)
-      .values(data)
-      .returning();
-    return outcome;
+ async addOutcome(data: NewOutcome): Promise<Outcome> {
+  const result = await db.insert(outcomes).values(data).$returningId();
+  const insertedId = result[0].id;
+  
+  const selectedOutcomes = await db
+    .select()
+    .from(outcomes)
+    .where(eq(outcomes.id, insertedId));
+  
+  if (!selectedOutcomes[0]) {
+    throw new Error('Failed to add outcome');
   }
+  
+  return selectedOutcomes[0];
+}
 
   async getCourseOutcomes(courseId: number): Promise<Outcome[]> {
     return await db
@@ -394,5 +427,5 @@ export const coursesRepository = new CoursesRepository();
 
 // Хелпер функция для count
 function count() {
-  return sql<number>`count(*)`;
+  return sql<number>`cast(count(*) as unsigned)`;
 }

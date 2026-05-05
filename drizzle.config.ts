@@ -6,13 +6,8 @@ dotenv.config({ path: '.env.local' });
 export default {
   schema: './lib/db/schema/*.ts',
   out: './lib/db/migrations',
-  dialect: 'postgresql',
+  dialect: 'mysql',
   dbCredentials: {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    database: process.env.DB_NAME || 'courses_db',
-    ssl: false,
+    url: process.env.DATABASE_URL || 'mysql://user:password@host:3306/database'
   },
 } satisfies Config;

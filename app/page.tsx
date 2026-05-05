@@ -45,7 +45,7 @@ const [stars, setStars] = useState<Array<{ left: string; top: string; delay: str
       <section 
         className="relative min-h-[80vh] flex items-center justify-center overflow-hidden"
         style={{
-          backgroundImage: 'url(/placeholder-hero.jpg)',
+          backgroundImage: 'url(https://storage.yandexcloud.net/backet-online-storage/courses/placeholder-hero.jpg)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundAttachment: 'fixed'

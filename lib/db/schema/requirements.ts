@@ -1,10 +1,10 @@
-import { pgTable, serial, text, integer } from 'drizzle-orm/pg-core';
+import { mysqlTable, serial, text, int } from 'drizzle-orm/mysql-core';
 import { courses } from './courses';
 
-export const requirements = pgTable('requirements', {
+export const requirements = mysqlTable('requirements', {
   id: serial('id').primaryKey(),
   text: text('text').notNull(),
-  courseId: integer('course_id')
+  courseId: int('course_id')
     .notNull()
     .references(() => courses.id, { onDelete: 'cascade' }),
 });

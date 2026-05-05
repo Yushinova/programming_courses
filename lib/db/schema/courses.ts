@@ -1,7 +1,7 @@
-import { pgTable, serial, varchar, text, integer, boolean, timestamp } from 'drizzle-orm/pg-core';
+import { mysqlTable, serial, varchar, text, int, boolean, timestamp } from 'drizzle-orm/mysql-core';
 import { categories } from './categories';
 
-export const courses = pgTable('courses', {
+export const courses = mysqlTable('courses', {
   id: serial('id').primaryKey(),
   title: varchar('title', { length: 200 }).notNull(),
   description: text('description').notNull(),
@@ -9,13 +9,13 @@ export const courses = pgTable('courses', {
     .notNull()
     .$type<'начальный' | 'средний' | 'продвинутый'>(),
   duration: varchar('duration', { length: 50 }).notNull(),
-  price: integer('price').notNull(),
+  price: int('price').notNull(),
   currency: varchar('currency', { length: 3 }).default('RUB'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   url: varchar('url', { length: 200 }).notNull().unique(),
   imageUrl: varchar('image_url', { length: 500 }),
-  categoryId: integer('category_id')
+  categoryId: int('category_id')
     .notNull()
     .references(() => categories.id, { onDelete: 'cascade' }),
 });
