@@ -81,7 +81,7 @@ async function getGPTResponseWithCoursesAnalysis(
 ): Promise<string> {
   try {
     // Формируем промпт для GPT с акцентом на использование ссылок
-    const systemPrompt = `Ты дружелюбный консультант по курсам программирования. Вот информация обо всех курсах:
+    const systemPrompt = `Ты дружелюбный консультант по курсам программирования. Здороваться не нужно. Вот информация обо всех курсах:
 
 ${coursesText}
 
