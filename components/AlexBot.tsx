@@ -64,7 +64,6 @@ export default function AlexBot({ isOpen, onClose }: AlexBotProps) {
     const userMessage = input.trim();
     setInput('');
     
-    // Добавляем сообщение пользователя
     const newMessages: ChatMessage[] = [
       ...messages,
       { role: 'user', content: userMessage }
@@ -167,9 +166,10 @@ export default function AlexBot({ isOpen, onClose }: AlexBotProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-4 bg-black/50 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl h-[95vh] md:h-[90vh] max-h-[800px] bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl md:rounded-2xl shadow-2xl overflow-hidden border border-gray-700 flex flex-col">
+      {/* Используем h-auto на мобильных и max-h на десктопе */}
+      <div className="relative w-full max-w-2xl h-full md:h-auto md:max-h-[90vh] bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl md:rounded-2xl shadow-2xl overflow-hidden border border-gray-700 flex flex-col">
         
-        {/* Упрощенный заголовок для мобильных */}
+        {/* Заголовок - всегда видимый */}
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 md:p-6 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 md:gap-3">
@@ -188,15 +188,15 @@ export default function AlexBot({ isOpen, onClose }: AlexBotProps) {
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 md:p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+              className="p-1.5 md:p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors flex-shrink-0"
             >
               <X className="w-4 h-4 md:w-5 md:h-5" />
             </button>
           </div>
         </div>
 
-        {/* Чат - занимает всё доступное пространство */}
-        <div ref={chatContainerRef} className="flex-1 flex flex-col min-h-0">
+        {/* Чат - используем flex для правильного распределения пространства */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           
           {/* Сообщения с прокруткой */}
           <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-3 md:space-y-6">
@@ -267,62 +267,64 @@ export default function AlexBot({ isOpen, onClose }: AlexBotProps) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Сворачиваемые быстрые вопросы */}
-          {isMobile ? (
-            <div className="flex-shrink-0 border-t border-gray-700 bg-gray-800/30">
-              <button
-                onClick={() => setShowSuggestions(!showSuggestions)}
-                className="w-full px-4 py-2 flex items-center justify-between text-sm text-gray-400 hover:text-gray-300 transition-colors"
-              >
-                <span className="flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" />
-                  Быстрые вопросы
-                </span>
-                {showSuggestions ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-              </button>
-              
-              {showSuggestions && (
-                <div className="px-3 pb-3">
-                  <div className="flex flex-wrap gap-1.5">
-                    {suggestedQuestions.map((question, index) => (
-                      <button
-                        key={index}
-                        onClick={() => {
-                          setInput(question);
-                          setTimeout(() => inputRef.current?.focus(), 50);
-                        }}
-                        className="text-xs px-2.5 py-1.5 bg-gray-800/50 hover:bg-gray-700/50 rounded-full text-gray-300 hover:text-white transition-colors border border-gray-700"
-                      >
-                        {question}
-                      </button>
-                    ))}
+          {/* Быстрые вопросы - сворачиваемые */}
+          <div className="flex-shrink-0 border-t border-gray-700 bg-gray-800/30">
+            {isMobile ? (
+              <>
+                <button
+                  onClick={() => setShowSuggestions(!showSuggestions)}
+                  className="w-full px-4 py-2 flex items-center justify-between text-sm text-gray-400 hover:text-gray-300 transition-colors"
+                >
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    Быстрые вопросы
+                  </span>
+                  {showSuggestions ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                </button>
+                
+                {showSuggestions && (
+                  <div className="px-3 pb-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      {suggestedQuestions.map((question, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setInput(question);
+                            setTimeout(() => inputRef.current?.focus(), 50);
+                          }}
+                          className="text-xs px-2.5 py-1.5 bg-gray-800/50 hover:bg-gray-700/50 rounded-full text-gray-300 hover:text-white transition-colors border border-gray-700"
+                        >
+                          {question}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+                )}
+              </>
+            ) : (
+              // Десктопная версия
+              <div className="px-6 py-3">
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-sm text-gray-400 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    Быстрый вопрос:
+                  </span>
+                  {suggestedQuestions.map((question, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        setInput(question);
+                        setTimeout(() => inputRef.current?.focus(), 50);
+                      }}
+                      className="text-sm px-3 py-1.5 bg-gray-800/50 hover:bg-gray-700/50 rounded-full text-gray-300 hover:text-white transition-colors border border-gray-700"
+                    >
+                      {question}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
-          ) : (
-            // Десктопная версия быстрых вопросов
-            <div className="flex-shrink-0 px-6 pb-4">
-              <div className="flex flex-wrap gap-2">
-                <span className="text-sm text-gray-400 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" />
-                  Быстрый вопрос:
-                </span>
-                {suggestedQuestions.map((question, index) => (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      setInput(question);
-                      setTimeout(() => inputRef.current?.focus(), 50);
-                    }}
-                    className="text-sm px-3 py-1.5 bg-gray-800/50 hover:bg-gray-700/50 rounded-full text-gray-300 hover:text-white transition-colors border border-gray-700"
-                  >
-                    {question}
-                  </button>
-                ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Поле ввода - фиксированное внизу */}
           <div className="flex-shrink-0 border-t border-gray-700 p-3 md:p-6 bg-gray-800/30">
